@@ -5,17 +5,41 @@ const MOUSE_POINTER_ID := -100
 
 const START_SPAWN_INTERVAL := 1.2
 const MIN_SPAWN_INTERVAL := 0.35
-const START_BOMB_LIFETIME := 4.0
+const START_BOMB_LIFETIME := 5.0
 const MIN_BOMB_LIFETIME := 1.8
 const START_BOMB_SPEED := 260.0
 const MAX_BOMB_SPEED := 520.0
 const PICK_MARGIN := 18.0
-const WARNING_LIFE_RATIO := 0.35
+const WARNING_START_SECONDS := 3.0
+const BOMB_SIZE_RATIO := 0.09
+const BOMB_MIN_SIDE := 34.0
+const SPRITE_ANIM_FPS := 1.25
+const SHADOW_WIDTH_RATIO := 0.74
+const SHADOW_HEIGHT_RATIO := 0.20
+const SHADOW_GAP_RATIO := -0.10
+const SHADOW_ALPHA := 0.30
 
 const BOMB_RED := "RED"
 const BOMB_BLUE := "BLUE"
 const BOMB_YELLOW := "YELLOW"
 const BOMB_GREEN := "GREEN"
+
+const RED_SPRITE_PATHS: Array[String] = [
+	"res://assets/sprites/red1.png",
+	"res://assets/sprites/red2.png",
+]
+const BLUE_SPRITE_PATHS: Array[String] = [
+	"res://assets/sprites/blue1.png",
+	"res://assets/sprites/blue2.png",
+]
+const GREEN_SPRITE_PATHS: Array[String] = [
+	"res://assets/sprites/green1.png",
+	"res://assets/sprites/green2.png",
+]
+const YELLOW_SPRITE_PATHS: Array[String] = [
+	"res://assets/sprites/yellow1.png",
+	"res://assets/sprites/yellow2.png",
+]
 
 enum GameState {
 	PLAYING,
@@ -51,6 +75,7 @@ var bomb_speed := START_BOMB_SPEED
 var spawn_accumulator := 0.0
 
 var bombs: Array[Dictionary] = []
+var sprite_variant_cache: Dictionary = {}
 
 var dragging_bomb: ColorRect = null
 var dragging_pointer_id := -9999
@@ -94,6 +119,8 @@ func _process(delta: float) -> void:
 			else:
 				move_bomb_with_bounce(bomb_data, delta)
 
+		update_bomb_shadow_transform(bomb_data)
+		update_bomb_sprite_animation(bomb_data, delta)
 		update_bomb_warning_visual(bomb_data)
 		bombs[i] = bomb_data
 
@@ -179,14 +206,14 @@ func update_drag_position(pointer_position: Vector2) -> void:
 	dragging_bomb.global_position = target
 
 
-func finish_drag(pointer_position: Vector2) -> void:
+func finish_drag(_pointer_position: Vector2) -> void:
 	if dragging_bomb == null:
 		return
 
 	var released_bomb := dragging_bomb
 	clear_drag_state()
 
-	var dropped_zone: Variant = zone_for_position(pointer_position)
+	var dropped_zone: Variant = zone_for_bomb(released_bomb)
 	var expected_zone: Variant = expected_zone_for_type(str(released_bomb.get_meta("bomb_type")))
 
 	if dropped_zone == null:
@@ -356,6 +383,11 @@ func zone_for_position(global_position: Vector2):
 	return null
 
 
+func zone_for_bomb(node: ColorRect):
+	var bomb_center: Vector2 = node.global_position + (node.size * 0.5)
+	return zone_for_position(bomb_center)
+
+
 func spawn_bomb() -> void:
 	var bomb := ColorRect.new()
 	bomb.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -365,22 +397,143 @@ func spawn_bomb() -> void:
 	bomb.color = color_for_type(bomb_type)
 
 	var viewport_size := get_viewport_rect().size
-	var bomb_side := maxf(44.0, viewport_size.x * 0.10)
+	var bomb_side := maxf(BOMB_MIN_SIDE, viewport_size.x * BOMB_SIZE_RATIO)
 	bomb.custom_minimum_size = Vector2(bomb_side, bomb_side)
 	bomb.size = Vector2(bomb_side, bomb_side)
+
+	var shadow_node: Panel = create_bomb_shadow(bomb_side)
+	play_area.add_child(shadow_node)
+
+	var sprite_node: TextureRect = apply_bomb_visual_variant(bomb, bomb_type)
 
 	play_area.add_child(bomb)
 
 	var spawn_data: Dictionary = get_spawn_data(bomb_side)
 	bomb.position = spawn_data["position"]
+	update_shadow_position(shadow_node, bomb)
 
 	bomb.set_meta("bomb_type", bomb_type)
-	bombs.append({
+	var bomb_data := {
 		"node": bomb,
+		"shadow_node": shadow_node,
 		"lifetime": bomb_lifetime,
 		"start_lifetime": bomb_lifetime,
 		"velocity": spawn_data["velocity"],
-	})
+	}
+	if sprite_node != null:
+		bomb_data["sprite_node"] = sprite_node
+		bomb_data["anim_time"] = randf()
+
+	bombs.append(bomb_data)
+
+
+func create_bomb_shadow(bomb_side: float) -> Panel:
+	var shadow := Panel.new()
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shadow.z_index = 5
+	shadow.custom_minimum_size = Vector2(bomb_side * SHADOW_WIDTH_RATIO, bomb_side * SHADOW_HEIGHT_RATIO)
+	shadow.size = shadow.custom_minimum_size
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.0, 0.0, 0.0, SHADOW_ALPHA)
+	var radius := int(shadow.size.y * 0.5)
+	style.corner_radius_top_left = radius
+	style.corner_radius_top_right = radius
+	style.corner_radius_bottom_left = radius
+	style.corner_radius_bottom_right = radius
+	shadow.add_theme_stylebox_override("panel", style)
+	return shadow
+
+
+func update_bomb_shadow_transform(bomb_data: Dictionary) -> void:
+	var bomb: ColorRect = bomb_data["node"]
+	if not is_instance_valid(bomb):
+		return
+	var shadow: Panel = bomb_data.get("shadow_node") as Panel
+	if shadow == null or not is_instance_valid(shadow):
+		return
+	update_shadow_position(shadow, bomb)
+	shadow.visible = bomb.visible
+
+
+func update_shadow_position(shadow: Panel, bomb: ColorRect) -> void:
+	var shadow_x := bomb.position.x + ((bomb.size.x - shadow.size.x) * 0.5)
+	var shadow_y := bomb.position.y + bomb.size.y + (bomb.size.y * SHADOW_GAP_RATIO)
+	shadow.position = Vector2(shadow_x, shadow_y)
+
+
+func apply_bomb_visual_variant(bomb: ColorRect, bomb_type: String) -> TextureRect:
+	var variants: Array = get_sprite_variants_for_type(bomb_type)
+	if variants.is_empty():
+		return null
+
+	# Bomb keeps the same logical square; only sprite is visible.
+	bomb.color = Color(1.0, 1.0, 1.0, 0.0)
+	var sprite: TextureRect = TextureRect.new()
+	sprite.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	sprite.layout_mode = 1
+	sprite.anchor_left = 0.0
+	sprite.anchor_top = 0.0
+	sprite.anchor_right = 1.0
+	sprite.anchor_bottom = 1.0
+	sprite.offset_left = 0.0
+	sprite.offset_top = 0.0
+	sprite.offset_right = 0.0
+	sprite.offset_bottom = 0.0
+	sprite.grow_horizontal = 2
+	sprite.grow_vertical = 2
+	sprite.stretch_mode = TextureRect.STRETCH_SCALE
+	sprite.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	sprite.texture = variants[0]
+	bomb.add_child(sprite)
+	return sprite
+
+
+func update_bomb_sprite_animation(bomb_data: Dictionary, delta: float) -> void:
+	var sprite: TextureRect = bomb_data.get("sprite_node") as TextureRect
+	if sprite == null or not is_instance_valid(sprite):
+		return
+
+	var bomb: ColorRect = bomb_data["node"]
+	var bomb_type := str(bomb.get_meta("bomb_type"))
+	var variants: Array = get_sprite_variants_for_type(bomb_type)
+	if variants.size() <= 1:
+		return
+
+	var anim_time := float(bomb_data.get("anim_time", 0.0)) + delta
+	bomb_data["anim_time"] = anim_time
+	var frame: int = int(floor(anim_time * SPRITE_ANIM_FPS)) % variants.size()
+	sprite.texture = variants[frame]
+
+
+func get_sprite_variants_for_type(bomb_type: String) -> Array:
+	match bomb_type:
+		BOMB_RED:
+			return get_or_load_sprite_variants("red", RED_SPRITE_PATHS)
+		BOMB_BLUE:
+			return get_or_load_sprite_variants("blue", BLUE_SPRITE_PATHS)
+		BOMB_GREEN:
+			return get_or_load_sprite_variants("green", GREEN_SPRITE_PATHS)
+		BOMB_YELLOW:
+			return get_or_load_sprite_variants("yellow", YELLOW_SPRITE_PATHS)
+		_:
+			return []
+
+
+func get_or_load_sprite_variants(cache_key: String, paths: Array[String]) -> Array:
+	if sprite_variant_cache.has(cache_key):
+		return sprite_variant_cache[cache_key]
+
+	var variants: Array = []
+	for path in paths:
+		if not ResourceLoader.exists(path):
+			continue
+		var tex := load(path)
+		if tex != null:
+			variants.append(tex)
+
+	sprite_variant_cache[cache_key] = variants
+	return variants
 
 
 func random_bomb_type() -> String:
@@ -418,41 +571,43 @@ func update_bomb_warning_visual(bomb_data: Dictionary) -> void:
 		return
 
 	var remaining := float(bomb_data["lifetime"])
-	var total := maxf(0.01, float(bomb_data.get("start_lifetime", bomb_lifetime)))
-	var ratio := remaining / total
-
-	if ratio > WARNING_LIFE_RATIO:
+	if remaining > WARNING_START_SECONDS:
 		bomb.self_modulate = Color(1.0, 1.0, 1.0, 1.0)
 		return
 
-	var intensity := clampf((WARNING_LIFE_RATIO - ratio) / WARNING_LIFE_RATIO, 0.0, 1.0)
-	var speed := lerpf(8.0, 20.0, intensity)
+	var intensity := clampf((WARNING_START_SECONDS - remaining) / WARNING_START_SECONDS, 0.0, 1.0)
+	var speed := lerpf(10.0, 24.0, intensity)
 	var pulse := 0.5 + (0.5 * sin(Time.get_ticks_msec() * 0.001 * speed))
-	var alpha := lerpf(0.45, 1.0, pulse)
+	var alpha := lerpf(0.35, 1.0, pulse)
 	bomb.self_modulate = Color(1.0, 1.0, 1.0, alpha)
 
 
 func get_spawn_data(bomb_side: float) -> Dictionary:
 	var play_global_pos: Vector2 = play_area.global_position
+	var viewport_rect := Rect2(Vector2.ZERO, get_viewport_rect().size)
 	var gates: Array[ColorRect] = [left_top_gate, left_bottom_gate, right_top_gate, right_bottom_gate]
 
 	for _attempt in range(16):
 		var gate: ColorRect = gates[randi() % gates.size()]
-		var gate_center := gate.position + (gate.size * 0.5)
+		var gate_global_rect: Rect2 = gate.get_global_rect()
+		var gate_center := gate_global_rect.get_center()
 		var margin := 8.0
-		var y_min := gate.position.y + margin
-		var y_max := gate.position.y + gate.size.y - bomb_side - margin
+		var y_min := gate_global_rect.position.y + margin
+		var y_max := gate_global_rect.end.y - bomb_side - margin
 		var spawn_y := gate_center.y - (bomb_side * 0.5)
 		if y_max > y_min:
 			spawn_y = randf_range(y_min, y_max)
-		var spawn_x := gate.position.x + gate.size.x + 4.0
+		var spawn_x := gate_global_rect.end.x + 4.0
 		var direction := Vector2.RIGHT
 		if gate == right_top_gate or gate == right_bottom_gate:
-			spawn_x = gate.position.x - bomb_side - 4.0
+			spawn_x = gate_global_rect.position.x - bomb_side - 4.0
 			direction = Vector2.LEFT
 
-		var pos := Vector2(spawn_x, spawn_y)
-		var spawn_rect := Rect2(play_global_pos + pos, Vector2(bomb_side, bomb_side))
+		var spawn_global_pos := Vector2(spawn_x, spawn_y)
+		spawn_global_pos.x = clampf(spawn_global_pos.x, viewport_rect.position.x, viewport_rect.end.x - bomb_side)
+		spawn_global_pos.y = clampf(spawn_global_pos.y, viewport_rect.position.y, viewport_rect.end.y - bomb_side)
+		var pos := spawn_global_pos - play_global_pos
+		var spawn_rect := Rect2(spawn_global_pos, Vector2(bomb_side, bomb_side))
 		if not intersects_any_zone_obstacle_global(spawn_rect):
 			var angle_offset := deg_to_rad(randf_range(-55.0, 55.0))
 			var velocity := direction.rotated(angle_offset).normalized() * bomb_speed
@@ -462,7 +617,11 @@ func get_spawn_data(bomb_side: float) -> Dictionary:
 			}
 
 	var fallback_gate: ColorRect = gates[randi() % gates.size()]
-	var fallback_pos := fallback_gate.position + (fallback_gate.size * 0.5) - Vector2(bomb_side * 0.5, bomb_side * 0.5)
+	var fallback_gate_rect: Rect2 = fallback_gate.get_global_rect()
+	var fallback_global_pos := fallback_gate_rect.get_center() - Vector2(bomb_side * 0.5, bomb_side * 0.5)
+	fallback_global_pos.x = clampf(fallback_global_pos.x, viewport_rect.position.x, viewport_rect.end.x - bomb_side)
+	fallback_global_pos.y = clampf(fallback_global_pos.y, viewport_rect.position.y, viewport_rect.end.y - bomb_side)
+	var fallback_pos := fallback_global_pos - play_global_pos
 	var fallback_dir := Vector2.RIGHT
 	if fallback_gate == right_top_gate or fallback_gate == right_bottom_gate:
 		fallback_dir = Vector2.LEFT
@@ -506,6 +665,9 @@ func reorder_dragging_bomb_to_front() -> void:
 func remove_bomb(node: ColorRect) -> void:
 	for i in range(bombs.size() - 1, -1, -1):
 		if bombs[i]["node"] == node:
+			var shadow: Panel = bombs[i].get("shadow_node") as Panel
+			if shadow != null and is_instance_valid(shadow):
+				shadow.queue_free()
 			bombs.remove_at(i)
 			break
 	if is_instance_valid(node):
@@ -515,8 +677,11 @@ func remove_bomb(node: ColorRect) -> void:
 func clear_all_bombs() -> void:
 	for bomb_data in bombs:
 		var node: ColorRect = bomb_data["node"]
+		var shadow: Panel = bomb_data.get("shadow_node") as Panel
 		if is_instance_valid(node):
 			node.queue_free()
+		if shadow != null and is_instance_valid(shadow):
+			shadow.queue_free()
 	bombs.clear()
 
 

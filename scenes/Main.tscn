@@ -18,17 +18,6 @@ anchor_bottom = 0.7
 offset_bottom = 379.0
 grow_horizontal = 2
 
-[node name="2gate" type="ColorRect" parent="gates" unique_id=2072315664]
-layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.5
-anchor_bottom = 1.0
-offset_top = 485.0
-offset_right = -343.0
-offset_bottom = -708.0
-grow_vertical = 2
-color = Color(0.6994872, 0.0032157118, 0.9673886, 1)
-
 [node name="1gate" type="ColorRect" parent="gates" unique_id=123333811]
 layout_mode = 1
 anchors_preset = -1
@@ -37,6 +26,17 @@ anchor_bottom = 1.0
 offset_top = 770.0
 offset_right = -343.0
 offset_bottom = -423.0
+grow_vertical = 2
+color = Color(0.6994872, 0.0032157118, 0.9673886, 1)
+
+[node name="2gate" type="ColorRect" parent="gates" unique_id=2043969033]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_top = 485.0
+offset_right = -343.0
+offset_bottom = -708.0
 grow_vertical = 2
 color = Color(0.6994872, 0.0032157118, 0.9673886, 1)
 
@@ -70,6 +70,7 @@ anchor_right = 1.0
 anchor_bottom = 0.4
 offset_bottom = 768.0
 grow_horizontal = 2
+scale = Vector2(0.9983627, 0.9992037)
 
 [node name="yellowZone" type="ColorRect" parent="ZonesArea" unique_id=1482375549]
 layout_mode = 1
@@ -86,8 +87,9 @@ layout_mode = 1
 anchors_preset = -1
 anchor_right = 0.5
 anchor_bottom = 1.0
+offset_left = 2.0
 offset_top = 47.0
-offset_right = -101.0
+offset_right = -99.0
 offset_bottom = -984.0
 grow_vertical = 2
 color = Color(0.86, 0.2, 0.2, 1)
