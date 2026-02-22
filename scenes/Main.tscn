@@ -1,8 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://b4iwxw40x2kfa"]
 
-[ext_resource type="Script" path="res://scripts/main.gd" id="1_m1"]
+[ext_resource type="Script" uid="uid://ojx43yql5l2e" path="res://scripts/main.gd" id="1_m1"]
 
-[node name="RootUI" type="Control"]
+[node name="RootUI" type="Control" unique_id=990227114]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -11,91 +11,133 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_m1")
 
-[node name="PlayArea" type="Control" parent="."]
+[node name="gates" type="Control" parent="." unique_id=2025302808]
 layout_mode = 1
-anchors_preset = 10
 anchor_right = 1.0
 anchor_bottom = 0.7
+offset_bottom = 379.0
 grow_horizontal = 2
 
-[node name="LeftGate" type="ColorRect" parent="PlayArea"]
-color = Color(1, 1, 1, 1)
-
-[node name="RightGate" type="ColorRect" parent="PlayArea"]
-color = Color(1, 1, 1, 1)
-
-[node name="TopZonesArea" type="Control" parent="."]
+[node name="2gate" type="ColorRect" parent="gates" unique_id=2072315664]
 layout_mode = 1
-anchors_preset = 10
-anchor_top = 0.0
-anchor_right = 1.0
-anchor_bottom = 0.40
-grow_horizontal = 2
-
-[node name="TopLeftZone" type="ColorRect" parent="TopZonesArea"]
-layout_mode = 1
-anchors_preset = 9
+anchors_preset = -1
 anchor_right = 0.5
 anchor_bottom = 1.0
+offset_top = 485.0
+offset_right = -343.0
+offset_bottom = -708.0
 grow_vertical = 2
-color = Color(0.86, 0.20, 0.20, 1)
+color = Color(0.6994872, 0.0032157118, 0.9673886, 1)
 
-[node name="TopRightZone" type="ColorRect" parent="TopZonesArea"]
+[node name="1gate" type="ColorRect" parent="gates" unique_id=123333811]
 layout_mode = 1
-anchors_preset = 11
-anchor_left = 0.5
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-color = Color(0.16, 0.42, 0.86, 1)
-
-[node name="ZonesArea" type="Control" parent="."]
-layout_mode = 1
-anchors_preset = 12
-anchor_top = 0.7
-anchor_right = 1.0
-anchor_bottom = 1.0
-grow_horizontal = 2
-grow_vertical = 2
-
-[node name="BottomLeftZone" type="ColorRect" parent="ZonesArea"]
-layout_mode = 1
-anchors_preset = 9
+anchors_preset = -1
 anchor_right = 0.5
 anchor_bottom = 1.0
+offset_top = 770.0
+offset_right = -343.0
+offset_bottom = -423.0
 grow_vertical = 2
-color = Color(0.96, 0.80, 0.20, 1)
+color = Color(0.6994872, 0.0032157118, 0.9673886, 1)
 
-[node name="BottomRightZone" type="ColorRect" parent="ZonesArea"]
+[node name="3gate" type="ColorRect" parent="gates" unique_id=1986809228]
 layout_mode = 1
-anchors_preset = 11
-anchor_left = 0.5
-anchor_right = 1.0
+anchors_preset = -1
+anchor_right = 0.5
 anchor_bottom = 1.0
-grow_horizontal = 2
+offset_left = 703.0
+offset_top = 770.0
+offset_right = 360.0
+offset_bottom = -423.0
 grow_vertical = 2
-color = Color(0.20, 0.70, 0.28, 1)
+color = Color(0.6994872, 0.0032157118, 0.9673886, 1)
 
-[node name="HUD" type="Control" parent="."]
+[node name="4gate" type="ColorRect" parent="gates" unique_id=1625480533]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 703.0
+offset_top = 485.0
+offset_right = 360.0
+offset_bottom = -708.0
+grow_vertical = 2
+color = Color(0.6994872, 0.0032157118, 0.9673886, 1)
+
+[node name="ZonesArea" type="Control" parent="." unique_id=1169637070]
+layout_mode = 1
+anchor_right = 1.0
+anchor_bottom = 0.4
+offset_bottom = 768.0
+grow_horizontal = 2
+
+[node name="yellowZone" type="ColorRect" parent="ZonesArea" unique_id=1482375549]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_top = 1031.0
+offset_right = -101.0
+grow_vertical = 2
+color = Color(0.81582147, 0.7104519, 0, 1)
+
+[node name="RedZone" type="ColorRect" parent="ZonesArea" unique_id=1485974140]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_top = 47.0
+offset_right = -101.0
+offset_bottom = -984.0
+grow_vertical = 2
+color = Color(0.86, 0.2, 0.2, 1)
+
+[node name="BlueZone" type="ColorRect" parent="ZonesArea" unique_id=1164579740]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 461.0
+offset_top = 47.0
+offset_right = 360.0
+offset_bottom = -984.0
+grow_vertical = 2
+color = Color(1.540184e-06, 0.5199557, 0.75865495, 1)
+
+[node name="GreenZone" type="ColorRect" parent="ZonesArea" unique_id=749491485]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = 461.0
+offset_top = 1023.0
+offset_right = 360.0
+grow_vertical = 2
+color = Color(0.027635064, 0.5909482, 0, 1)
+
+[node name="HUD" type="Control" parent="." unique_id=1285168376]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_left = 2.0
+offset_right = 3.0
+offset_bottom = -5.0
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="ScoreBox" type="Panel" parent="HUD"]
+[node name="ScoreBox" type="Panel" parent="HUD" unique_id=897563242]
 layout_mode = 1
-anchors_preset = 10
+anchors_preset = -1
 anchor_left = 0.03
 anchor_right = 0.97
-offset_top = 6.0
-offset_bottom = 52.0
+offset_left = -23.63
+offset_right = 17.630005
+offset_bottom = 47.0
 grow_horizontal = 2
 
-[node name="HBox" type="HBoxContainer" parent="HUD/ScoreBox"]
+[node name="HBox" type="HBoxContainer" parent="HUD/ScoreBox" unique_id=975924823]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -104,33 +146,38 @@ offset_left = 12.0
 offset_top = 5.0
 offset_right = -12.0
 offset_bottom = -5.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/separation = 20
 alignment = 1
 
-[node name="ScoreLabel" type="Label" parent="HUD/ScoreBox/HBox"]
+[node name="ScoreLabel" type="Label" parent="HUD/ScoreBox/HBox" unique_id=790654406]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 24
-horizontal_alignment = 1
 text = "Score: 0"
+horizontal_alignment = 1
 
-[node name="BestLabel" type="Label" parent="HUD/ScoreBox/HBox"]
+[node name="BestLabel" type="Label" parent="HUD/ScoreBox/HBox" unique_id=527498951]
 layout_mode = 2
 size_flags_horizontal = 3
 theme_override_font_sizes/font_size = 22
-horizontal_alignment = 1
 text = "Best: 0"
+horizontal_alignment = 1
 
-[node name="GameOverPanel" type="Panel" parent="."]
+[node name="GameOverPanel" type="Panel" parent="." unique_id=836445127]
 visible = false
+z_index = 100
 layout_mode = 1
-anchors_preset = 8
+anchors_preset = -1
 anchor_left = 0.16
 anchor_top = 0.32
 anchor_right = 0.84
 anchor_bottom = 0.68
+grow_horizontal = 2
+grow_vertical = 2
 
-[node name="VBox" type="VBoxContainer" parent="GameOverPanel"]
+[node name="VBox" type="VBoxContainer" parent="GameOverPanel" unique_id=201597992]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -139,16 +186,18 @@ offset_left = 20.0
 offset_top = 20.0
 offset_right = -20.0
 offset_bottom = -20.0
+grow_horizontal = 2
+grow_vertical = 2
 theme_override_constants/separation = 24
 alignment = 1
 
-[node name="GameOverText" type="Label" parent="GameOverPanel/VBox"]
+[node name="GameOverText" type="Label" parent="GameOverPanel/VBox" unique_id=154614352]
 layout_mode = 2
 theme_override_font_sizes/font_size = 44
-horizontal_alignment = 1
 text = "GAME OVER"
+horizontal_alignment = 1
 
-[node name="RestartButton" type="Button" parent="GameOverPanel/VBox"]
+[node name="RestartButton" type="Button" parent="GameOverPanel/VBox" unique_id=1293210755]
 layout_mode = 2
 size_flags_horizontal = 4
 theme_override_font_sizes/font_size = 34

@@ -22,12 +22,12 @@ enum GameState {
 	GAME_OVER,
 }
 
-@onready var play_area: Control = $PlayArea
-@onready var top_zones_area: Control = $TopZonesArea
-@onready var bottom_zones_area: Control = $ZonesArea
+@onready var play_area: Control = $gates
 
-@onready var left_gate: ColorRect = $PlayArea/LeftGate
-@onready var right_gate: ColorRect = $PlayArea/RightGate
+@onready var left_top_gate: ColorRect = $"gates/2gate"
+@onready var left_bottom_gate: ColorRect = $"gates/1gate"
+@onready var right_top_gate: ColorRect = $"gates/4gate"
+@onready var right_bottom_gate: ColorRect = $"gates/3gate"
 
 @onready var score_label: Label = $HUD/ScoreBox/HBox/ScoreLabel
 @onready var best_label: Label = $HUD/ScoreBox/HBox/BestLabel
@@ -36,10 +36,10 @@ enum GameState {
 @onready var game_over_text: Label = $GameOverPanel/VBox/GameOverText
 @onready var restart_button: Button = $GameOverPanel/VBox/RestartButton
 
-@onready var top_left_zone: ColorRect = $TopZonesArea/TopLeftZone
-@onready var top_right_zone: ColorRect = $TopZonesArea/TopRightZone
-@onready var bottom_left_zone: ColorRect = $ZonesArea/BottomLeftZone
-@onready var bottom_right_zone: ColorRect = $ZonesArea/BottomRightZone
+@onready var top_left_zone: ColorRect = $ZonesArea/RedZone
+@onready var top_right_zone: ColorRect = $ZonesArea/BlueZone
+@onready var bottom_left_zone: ColorRect = $ZonesArea/yellowZone
+@onready var bottom_right_zone: ColorRect = $ZonesArea/GreenZone
 
 var game_state: GameState = GameState.PLAYING
 var score := 0
@@ -60,12 +60,7 @@ var drag_offset := Vector2.ZERO
 func _ready() -> void:
 	randomize()
 	restart_button.pressed.connect(_on_restart_pressed)
-	resized.connect(_on_root_resized)
 	load_best_score()
-	prepare_zone_nodes()
-	apply_zone_frame_visuals()
-	layout_zone_squares()
-	layout_gates()
 	apply_pixel_font_if_available()
 	reset_game()
 
@@ -194,7 +189,10 @@ func finish_drag(pointer_position: Vector2) -> void:
 	var dropped_zone: Variant = zone_for_position(pointer_position)
 	var expected_zone: Variant = expected_zone_for_type(str(released_bomb.get_meta("bomb_type")))
 
-	if dropped_zone != null and dropped_zone == expected_zone:
+	if dropped_zone == null:
+		return
+
+	if dropped_zone == expected_zone:
 		score += 1
 		update_hud()
 		park_bomb_in_zone(released_bomb, expected_zone)
@@ -296,6 +294,7 @@ func move_bomb_inside_zone(bomb_data: Dictionary, delta: float) -> void:
 func park_bomb_in_zone(node: ColorRect, zone: ColorRect) -> void:
 	var zone_rect: Rect2 = zone.get_global_rect()
 	var bomb_rect := Rect2(node.global_position, node.size)
+	node.z_index = 20
 
 	var min_x := zone_rect.position.x
 	var max_x := zone_rect.end.x - node.size.x
@@ -360,6 +359,7 @@ func zone_for_position(global_position: Vector2):
 func spawn_bomb() -> void:
 	var bomb := ColorRect.new()
 	bomb.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bomb.z_index = 10
 
 	var bomb_type := random_bomb_type()
 	bomb.color = color_for_type(bomb_type)
@@ -399,13 +399,13 @@ func random_bomb_type() -> String:
 func color_for_type(bomb_type: String) -> Color:
 	match bomb_type:
 		BOMB_RED:
-			return Color(0.86, 0.20, 0.20, 1.0)
+			return Color(0.58, 0.14, 0.14, 1.0)
 		BOMB_BLUE:
-			return Color(0.16, 0.42, 0.86, 1.0)
+			return Color(0.11, 0.28, 0.58, 1.0)
 		BOMB_YELLOW:
-			return Color(0.96, 0.80, 0.20, 1.0)
+			return Color(0.64, 0.52, 0.13, 1.0)
 		_:
-			return Color(0.20, 0.70, 0.28, 1.0)
+			return Color(0.13, 0.47, 0.19, 1.0)
 
 
 func update_bomb_warning_visual(bomb_data: Dictionary) -> void:
@@ -434,7 +434,7 @@ func update_bomb_warning_visual(bomb_data: Dictionary) -> void:
 
 func get_spawn_data(bomb_side: float) -> Dictionary:
 	var play_global_pos: Vector2 = play_area.global_position
-	var gates: Array[ColorRect] = [left_gate, right_gate]
+	var gates: Array[ColorRect] = [left_top_gate, left_bottom_gate, right_top_gate, right_bottom_gate]
 
 	for _attempt in range(16):
 		var gate: ColorRect = gates[randi() % gates.size()]
@@ -447,7 +447,7 @@ func get_spawn_data(bomb_side: float) -> Dictionary:
 			spawn_y = randf_range(y_min, y_max)
 		var spawn_x := gate.position.x + gate.size.x + 4.0
 		var direction := Vector2.RIGHT
-		if gate == right_gate:
+		if gate == right_top_gate or gate == right_bottom_gate:
 			spawn_x = gate.position.x - bomb_side - 4.0
 			direction = Vector2.LEFT
 
@@ -464,7 +464,7 @@ func get_spawn_data(bomb_side: float) -> Dictionary:
 	var fallback_gate: ColorRect = gates[randi() % gates.size()]
 	var fallback_pos := fallback_gate.position + (fallback_gate.size * 0.5) - Vector2(bomb_side * 0.5, bomb_side * 0.5)
 	var fallback_dir := Vector2.RIGHT
-	if fallback_gate == right_gate:
+	if fallback_gate == right_top_gate or fallback_gate == right_bottom_gate:
 		fallback_dir = Vector2.LEFT
 	var fallback_velocity := fallback_dir.rotated(deg_to_rad(randf_range(-25.0, 25.0))).normalized() * bomb_speed
 	return {
@@ -561,7 +561,6 @@ func reset_game() -> void:
 	bomb_speed = START_BOMB_SPEED
 	spawn_accumulator = 0.0
 
-	layout_zone_squares()
 	game_over_panel.visible = false
 	update_hud()
 
@@ -590,111 +589,6 @@ func save_best_score() -> void:
 	cfg.save(SAVE_PATH)
 
 
-func _on_root_resized() -> void:
-	layout_zone_squares()
-	layout_gates()
-
-
-func prepare_zone_nodes() -> void:
-	var all_zones: Array[ColorRect] = [top_left_zone, top_right_zone, bottom_left_zone, bottom_right_zone]
-	for zone: ColorRect in all_zones:
-		zone.anchor_left = 0.0
-		zone.anchor_top = 0.0
-		zone.anchor_right = 0.0
-		zone.anchor_bottom = 0.0
-
-
-func apply_zone_frame_visuals() -> void:
-	configure_zone_frame(top_left_zone, Color(0.86, 0.20, 0.20, 1.0))
-	configure_zone_frame(top_right_zone, Color(0.16, 0.42, 0.86, 1.0))
-	configure_zone_frame(bottom_left_zone, Color(0.96, 0.80, 0.20, 1.0))
-	configure_zone_frame(bottom_right_zone, Color(0.20, 0.70, 0.28, 1.0))
-
-
-func configure_zone_frame(zone: ColorRect, border_color: Color) -> void:
-	zone.color = Color(0.0, 0.0, 0.0, 0.0)
-	ensure_zone_border_part(zone, "BorderTop", border_color)
-	ensure_zone_border_part(zone, "BorderBottom", border_color)
-	ensure_zone_border_part(zone, "BorderLeft", border_color)
-	ensure_zone_border_part(zone, "BorderRight", border_color)
-	layout_zone_border(zone)
-
-
-func ensure_zone_border_part(zone: ColorRect, node_name: String, border_color: Color) -> void:
-	var part: ColorRect = zone.get_node_or_null(node_name) as ColorRect
-	if part == null:
-		part = ColorRect.new()
-		part.name = node_name
-		part.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		zone.add_child(part)
-	part.color = border_color
-
-
-func layout_zone_border(zone: ColorRect) -> void:
-	var thickness := maxf(3.0, zone.size.x * 0.035)
-
-	var top: ColorRect = zone.get_node("BorderTop") as ColorRect
-	top.anchor_left = 0.0
-	top.anchor_top = 0.0
-	top.anchor_right = 1.0
-	top.anchor_bottom = 0.0
-	top.offset_left = 0.0
-	top.offset_top = 0.0
-	top.offset_right = 0.0
-	top.offset_bottom = thickness
-
-	var bottom: ColorRect = zone.get_node("BorderBottom") as ColorRect
-	bottom.anchor_left = 0.0
-	bottom.anchor_top = 1.0
-	bottom.anchor_right = 1.0
-	bottom.anchor_bottom = 1.0
-	bottom.offset_left = 0.0
-	bottom.offset_top = -thickness
-	bottom.offset_right = 0.0
-	bottom.offset_bottom = 0.0
-
-	var left: ColorRect = zone.get_node("BorderLeft") as ColorRect
-	left.anchor_left = 0.0
-	left.anchor_top = 0.0
-	left.anchor_right = 0.0
-	left.anchor_bottom = 1.0
-	left.offset_left = 0.0
-	left.offset_top = 0.0
-	left.offset_right = thickness
-	left.offset_bottom = 0.0
-
-	var right: ColorRect = zone.get_node("BorderRight") as ColorRect
-	right.anchor_left = 1.0
-	right.anchor_top = 0.0
-	right.anchor_right = 1.0
-	right.anchor_bottom = 1.0
-	right.offset_left = -thickness
-	right.offset_top = 0.0
-	right.offset_right = 0.0
-	right.offset_bottom = 0.0
-
-
-func layout_zone_squares() -> void:
-	layout_pair_in_corners(top_zones_area, top_left_zone, top_right_zone, true)
-	layout_pair_in_corners(bottom_zones_area, bottom_left_zone, bottom_right_zone, false)
-
-
-func layout_gates() -> void:
-	var gate_width := 14.0
-	var gate_height := clampf(play_area.size.y * 0.14, 58.0, 104.0)
-	var horizontal_inset := 0.0
-	var min_y := score_box.get_global_rect().end.y - play_area.global_position.y + 6.0
-	var max_y := maxf(min_y, play_area.size.y - gate_height)
-	var middle_ratio := 0.62
-	var middle_y := clampf(lerpf(min_y, max_y, middle_ratio), min_y, max_y)
-
-	left_gate.position = Vector2(horizontal_inset, middle_y)
-	left_gate.size = Vector2(gate_width, gate_height)
-
-	right_gate.position = Vector2(play_area.size.x - horizontal_inset - gate_width, middle_y)
-	right_gate.size = Vector2(gate_width, gate_height)
-
-
 func apply_pixel_font_if_available() -> void:
 	var font_path := "res://assets/fonts/PressStart2P-Regular.ttf"
 	if not ResourceLoader.exists(font_path):
@@ -708,30 +602,3 @@ func apply_pixel_font_if_available() -> void:
 	best_label.add_theme_font_override("font", font_resource)
 	game_over_text.add_theme_font_override("font", font_resource)
 	restart_button.add_theme_font_override("font", font_resource)
-
-
-func layout_pair_in_corners(area: Control, left_zone: ColorRect, right_zone: ColorRect, is_top_row: bool) -> void:
-	var area_size := area.size
-	if area_size.x <= 0.0 or area_size.y <= 0.0:
-		return
-
-	var max_side_by_height := maxf(16.0, area_size.y * 0.84)
-	var max_side_by_width := maxf(16.0, area_size.x * 0.40)
-	var side := minf(max_side_by_height, max_side_by_width)
-
-	var left_x := 0.0
-	var right_x := area_size.x - side
-
-	var y := area_size.y - side
-	if is_top_row:
-		var score_bottom_global := score_box.get_global_rect().end.y
-		var min_y_from_score := score_bottom_global - area.global_position.y
-		y = clampf(min_y_from_score, 0.0, area_size.y - side)
-
-	left_zone.position = Vector2(left_x, y)
-	left_zone.size = Vector2(side, side)
-	layout_zone_border(left_zone)
-
-	right_zone.position = Vector2(right_x, y)
-	right_zone.size = Vector2(side, side)
-	layout_zone_border(right_zone)
