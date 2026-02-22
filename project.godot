@@ -11,9 +11,17 @@ config_version=5
 [application]
 
 config/name="bomumon"
-run/main_scene="uid://bhlmp821ytdo6"
+run/main_scene="res://scenes/Main.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=720
+window/size/viewport_height=1280
+window/size/mode=0
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
 
 [physics]
 
