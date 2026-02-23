@@ -8,3 +8,4 @@
 
 # Aseprite files
 *.af
+*.af~lock~

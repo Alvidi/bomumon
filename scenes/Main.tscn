@@ -168,7 +168,6 @@ text = "Best: 0"
 horizontal_alignment = 1
 
 [node name="GameOverPanel" type="Panel" parent="." unique_id=836445127]
-visible = false
 z_index = 100
 layout_mode = 1
 anchors_preset = -1
@@ -178,6 +177,7 @@ anchor_right = 0.84
 anchor_bottom = 0.68
 grow_horizontal = 2
 grow_vertical = 2
+scale = Vector2(1.0011218, 1.0023936)
 
 [node name="VBox" type="VBoxContainer" parent="GameOverPanel" unique_id=201597992]
 layout_mode = 1
@@ -190,6 +190,7 @@ offset_right = -20.0
 offset_bottom = -20.0
 grow_horizontal = 2
 grow_vertical = 2
+scale = Vector2(1.0000503, 1.0831302)
 theme_override_constants/separation = 24
 alignment = 1
 

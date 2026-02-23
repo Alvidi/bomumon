@@ -10,14 +10,20 @@ const MIN_BOMB_LIFETIME := 1.8
 const START_BOMB_SPEED := 260.0
 const MAX_BOMB_SPEED := 520.0
 const PICK_MARGIN := 18.0
-const WARNING_START_SECONDS := 3.0
+const WARNING_START_SECONDS := 2.0
 const BOMB_SIZE_RATIO := 0.09
 const BOMB_MIN_SIDE := 34.0
 const SPRITE_ANIM_FPS := 1.25
+const WARNING_SPRITE_ANIM_FPS := 2.2
 const SHADOW_WIDTH_RATIO := 0.74
 const SHADOW_HEIGHT_RATIO := 0.20
 const SHADOW_GAP_RATIO := -0.10
 const SHADOW_ALPHA := 0.30
+const GAME_OVER_COUNT_FONT_SIZE := 26
+const WARNING_PULSE_SCALE_MIN := 1.0
+const WARNING_PULSE_SCALE_MAX := 1.30
+const WARNING_PULSE_SPEED := 7.0
+const RELEASE_TIME_GRACE := 0.20
 
 const BOMB_RED := "RED"
 const BOMB_BLUE := "BLUE"
@@ -28,9 +34,17 @@ const RED_SPRITE_PATHS: Array[String] = [
 	"res://assets/sprites/red1.png",
 	"res://assets/sprites/red2.png",
 ]
+const RED_WARNING_SPRITE_PATHS: Array[String] = [
+	"res://assets/sprites/redExplote1.png",
+	"res://assets/sprites/redExplote2.png",
+]
 const BLUE_SPRITE_PATHS: Array[String] = [
 	"res://assets/sprites/blue1.png",
 	"res://assets/sprites/blue2.png",
+]
+const BLUE_WARNING_SPRITE_PATHS: Array[String] = [
+	"res://assets/sprites/blueExplote1.png",
+	"res://assets/sprites/blueExplote2.png",
 ]
 const GREEN_SPRITE_PATHS: Array[String] = [
 	"res://assets/sprites/green1.png",
@@ -57,6 +71,7 @@ enum GameState {
 @onready var best_label: Label = $HUD/ScoreBox/HBox/BestLabel
 @onready var score_box: Panel = $HUD/ScoreBox
 @onready var game_over_panel: Panel = $GameOverPanel
+@onready var game_over_vbox: VBoxContainer = $GameOverPanel/VBox
 @onready var game_over_text: Label = $GameOverPanel/VBox/GameOverText
 @onready var restart_button: Button = $GameOverPanel/VBox/RestartButton
 
@@ -76,6 +91,8 @@ var spawn_accumulator := 0.0
 
 var bombs: Array[Dictionary] = []
 var sprite_variant_cache: Dictionary = {}
+var caught_counts: Dictionary = {}
+var game_over_count_labels: Dictionary = {}
 
 var dragging_bomb: ColorRect = null
 var dragging_pointer_id := -9999
@@ -86,6 +103,7 @@ func _ready() -> void:
 	randomize()
 	restart_button.pressed.connect(_on_restart_pressed)
 	load_best_score()
+	setup_game_over_catch_stats_ui()
 	apply_pixel_font_if_available()
 	reset_game()
 
@@ -107,7 +125,12 @@ func _process(delta: float) -> void:
 			continue
 
 		var parked := bool(bomb_data.get("parked", false))
-		if not parked:
+		var release_grace := float(bomb_data.get("release_grace", 0.0))
+		if release_grace > 0.0:
+			release_grace = maxf(0.0, release_grace - delta)
+			bomb_data["release_grace"] = release_grace
+		var timer_paused := parked or (bomb_node == dragging_bomb) or release_grace > 0.0
+		if not timer_paused:
 			bomb_data["lifetime"] = float(bomb_data["lifetime"]) - delta
 			if float(bomb_data["lifetime"]) <= 0.0:
 				trigger_game_over("Time up")
@@ -211,15 +234,18 @@ func finish_drag(_pointer_position: Vector2) -> void:
 		return
 
 	var released_bomb := dragging_bomb
+	var bomb_type := str(released_bomb.get_meta("bomb_type"))
 	clear_drag_state()
+	set_release_grace_for_bomb(released_bomb, RELEASE_TIME_GRACE)
 
 	var dropped_zone: Variant = zone_for_bomb(released_bomb)
-	var expected_zone: Variant = expected_zone_for_type(str(released_bomb.get_meta("bomb_type")))
+	var expected_zone: Variant = expected_zone_for_type(bomb_type)
 
 	if dropped_zone == null:
 		return
 
 	if dropped_zone == expected_zone:
+		increment_caught_count(bomb_type)
 		score += 1
 		update_hud()
 		park_bomb_in_zone(released_bomb, expected_zone)
@@ -400,6 +426,7 @@ func spawn_bomb() -> void:
 	var bomb_side := maxf(BOMB_MIN_SIDE, viewport_size.x * BOMB_SIZE_RATIO)
 	bomb.custom_minimum_size = Vector2(bomb_side, bomb_side)
 	bomb.size = Vector2(bomb_side, bomb_side)
+	bomb.pivot_offset = bomb.size * 0.5
 
 	var shadow_node: Panel = create_bomb_shadow(bomb_side)
 	play_area.add_child(shadow_node)
@@ -418,6 +445,7 @@ func spawn_bomb() -> void:
 		"shadow_node": shadow_node,
 		"lifetime": bomb_lifetime,
 		"start_lifetime": bomb_lifetime,
+		"release_grace": 0.0,
 		"velocity": spawn_data["velocity"],
 	}
 	if sprite_node != null:
@@ -496,13 +524,20 @@ func update_bomb_sprite_animation(bomb_data: Dictionary, delta: float) -> void:
 
 	var bomb: ColorRect = bomb_data["node"]
 	var bomb_type := str(bomb.get_meta("bomb_type"))
+	var remaining := float(bomb_data.get("lifetime", 9999.0))
 	var variants: Array = get_sprite_variants_for_type(bomb_type)
+	var anim_fps := SPRITE_ANIM_FPS
+	if remaining <= WARNING_START_SECONDS and not bool(bomb_data.get("parked", false)):
+		var warning_variants: Array = get_warning_sprite_variants_for_type(bomb_type)
+		if warning_variants.size() > 0:
+			variants = warning_variants
+			anim_fps = WARNING_SPRITE_ANIM_FPS
 	if variants.size() <= 1:
 		return
 
 	var anim_time := float(bomb_data.get("anim_time", 0.0)) + delta
 	bomb_data["anim_time"] = anim_time
-	var frame: int = int(floor(anim_time * SPRITE_ANIM_FPS)) % variants.size()
+	var frame: int = int(floor(anim_time * anim_fps)) % variants.size()
 	sprite.texture = variants[frame]
 
 
@@ -516,6 +551,16 @@ func get_sprite_variants_for_type(bomb_type: String) -> Array:
 			return get_or_load_sprite_variants("green", GREEN_SPRITE_PATHS)
 		BOMB_YELLOW:
 			return get_or_load_sprite_variants("yellow", YELLOW_SPRITE_PATHS)
+		_:
+			return []
+
+
+func get_warning_sprite_variants_for_type(bomb_type: String) -> Array:
+	match bomb_type:
+		BOMB_RED:
+			return get_or_load_sprite_variants("red_warning", RED_WARNING_SPRITE_PATHS)
+		BOMB_BLUE:
+			return get_or_load_sprite_variants("blue_warning", BLUE_WARNING_SPRITE_PATHS)
 		_:
 			return []
 
@@ -566,20 +611,29 @@ func update_bomb_warning_visual(bomb_data: Dictionary) -> void:
 	if not is_instance_valid(bomb):
 		return
 
+	# Holding a bomb pauses its countdown and warning feedback.
+	if bomb == dragging_bomb:
+		bomb.self_modulate = Color(1.0, 1.0, 1.0, 1.0)
+		bomb.scale = Vector2.ONE
+		return
+
 	if bool(bomb_data.get("parked", false)):
 		bomb.self_modulate = Color(1.0, 1.0, 1.0, 1.0)
+		bomb.scale = Vector2.ONE
 		return
 
 	var remaining := float(bomb_data["lifetime"])
 	if remaining > WARNING_START_SECONDS:
 		bomb.self_modulate = Color(1.0, 1.0, 1.0, 1.0)
+		bomb.scale = Vector2.ONE
 		return
 
 	var intensity := clampf((WARNING_START_SECONDS - remaining) / WARNING_START_SECONDS, 0.0, 1.0)
-	var speed := lerpf(10.0, 24.0, intensity)
-	var pulse := 0.5 + (0.5 * sin(Time.get_ticks_msec() * 0.001 * speed))
+	var pulse := 0.5 + (0.5 * sin(Time.get_ticks_msec() * 0.001 * WARNING_PULSE_SPEED))
 	var alpha := lerpf(0.35, 1.0, pulse)
 	bomb.self_modulate = Color(1.0, 1.0, 1.0, alpha)
+	var pulse_scale := lerpf(WARNING_PULSE_SCALE_MIN, WARNING_PULSE_SCALE_MAX, pulse)
+	bomb.scale = Vector2(pulse_scale, pulse_scale)
 
 
 func get_spawn_data(bomb_side: float) -> Dictionary:
@@ -705,6 +759,7 @@ func trigger_game_over(reason: String) -> void:
 		save_best_score()
 
 	update_hud()
+	update_game_over_catch_stats_ui()
 	game_over_text.text = "GAME OVER\n" + reason + "\nScore: %d" % score
 	game_over_panel.visible = true
 
@@ -725,9 +780,16 @@ func reset_game() -> void:
 	bomb_lifetime = START_BOMB_LIFETIME
 	bomb_speed = START_BOMB_SPEED
 	spawn_accumulator = 0.0
+	caught_counts = {
+		BOMB_RED: 0,
+		BOMB_BLUE: 0,
+		BOMB_YELLOW: 0,
+		BOMB_GREEN: 0,
+	}
 
 	game_over_panel.visible = false
 	update_hud()
+	update_game_over_catch_stats_ui()
 
 
 func update_hud() -> void:
@@ -767,3 +829,74 @@ func apply_pixel_font_if_available() -> void:
 	best_label.add_theme_font_override("font", font_resource)
 	game_over_text.add_theme_font_override("font", font_resource)
 	restart_button.add_theme_font_override("font", font_resource)
+	for bomb_type in game_over_count_labels.keys():
+		var count_label: Label = game_over_count_labels[bomb_type]
+		if count_label != null and is_instance_valid(count_label):
+			count_label.add_theme_font_override("font", font_resource)
+
+
+func setup_game_over_catch_stats_ui() -> void:
+	var existing: Node = game_over_vbox.get_node_or_null("CatchStats")
+	if existing != null:
+		existing.queue_free()
+
+	var stats_box: HBoxContainer = HBoxContainer.new()
+	stats_box.name = "CatchStats"
+	stats_box.alignment = BoxContainer.ALIGNMENT_CENTER
+	stats_box.add_theme_constant_override("separation", 20)
+	game_over_vbox.add_child(stats_box)
+	game_over_vbox.move_child(stats_box, 1)
+
+	var icon_side := get_game_bomb_side_for_ui()
+	game_over_count_labels.clear()
+	var order: Array[String] = [BOMB_RED, BOMB_BLUE, BOMB_YELLOW, BOMB_GREEN]
+	for bomb_type in order:
+		var row: HBoxContainer = HBoxContainer.new()
+		row.alignment = BoxContainer.ALIGNMENT_CENTER
+		row.add_theme_constant_override("separation", 10)
+		stats_box.add_child(row)
+
+		var icon: TextureRect = TextureRect.new()
+		icon.custom_minimum_size = Vector2(icon_side, icon_side)
+		icon.size = icon.custom_minimum_size
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon.stretch_mode = TextureRect.STRETCH_SCALE
+		icon.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		var variants: Array = get_sprite_variants_for_type(bomb_type)
+		if variants.size() > 0:
+			icon.texture = variants[0]
+		row.add_child(icon)
+
+		var count_label: Label = Label.new()
+		count_label.text = "x0"
+		count_label.add_theme_font_size_override("font_size", GAME_OVER_COUNT_FONT_SIZE)
+		row.add_child(count_label)
+		game_over_count_labels[bomb_type] = count_label
+
+
+func get_game_bomb_side_for_ui() -> float:
+	var viewport_size: Vector2 = get_viewport_rect().size
+	return maxf(BOMB_MIN_SIDE, viewport_size.x * BOMB_SIZE_RATIO)
+
+
+func update_game_over_catch_stats_ui() -> void:
+	for bomb_type in game_over_count_labels.keys():
+		var count_label: Label = game_over_count_labels[bomb_type]
+		if count_label == null or not is_instance_valid(count_label):
+			continue
+		var count := int(caught_counts.get(bomb_type, 0))
+		count_label.text = "x%d" % count
+
+
+func increment_caught_count(bomb_type: String) -> void:
+	var current := int(caught_counts.get(bomb_type, 0))
+	caught_counts[bomb_type] = current + 1
+
+
+func set_release_grace_for_bomb(node: ColorRect, seconds: float) -> void:
+	for i in range(bombs.size() - 1, -1, -1):
+		if bombs[i]["node"] == node:
+			var data: Dictionary = bombs[i]
+			data["release_grace"] = maxf(0.0, seconds)
+			bombs[i] = data
+			return
